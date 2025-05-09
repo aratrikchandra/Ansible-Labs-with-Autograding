@@ -52,7 +52,7 @@ def run_remote_command(command, key_path, user, host):
 
 def verify_prerequisites(key_path, user, host):
     """Verify required packages are installed"""
-    packages = ['curl', 'ca-certificates', 'gnupg']
+    packages = ['curl', 'ca-certificates', 'gnupg', 'nginx']
     for pkg in packages:
         out, err = run_remote_command(f"dpkg -s {pkg}", key_path, user, host)
         if not out or 'Status: install ok installed' not in out:
@@ -61,7 +61,6 @@ def verify_prerequisites(key_path, user, host):
 
 def verify_nodesource_repo(key_path, user, host):
     """Verify NodeSource repository exists"""
-    # First check if the repository file exists
     out, err = run_remote_command(
         "[ -f /etc/apt/sources.list.d/nodesource.list ] && echo exists",
         key_path, user, host
@@ -85,53 +84,193 @@ def verify_npm_version(key_path, user, host):
     return False, "npm 10.9.2 not installed"
 
 def verify_app_directory(key_path, user, host):
-    """Verify app directory permissions"""
-    # First check if directory exists
+    """Verify Node.js app directory permissions"""
     out, err = run_remote_command(
         "[ -d /home/ubuntu/app ] && echo exists",
         key_path, user, host
     )
     if out != "exists":
-        return False, "App directory missing"
-
-    # Check permissions with properly quoted format string
+        return False, "Node.js app directory missing"
     out, err = run_remote_command(
-        'stat -c "%U:%G %a" /home/ubuntu/app',  # Double quotes for format
+        'stat -c "%U:%G %a" /home/ubuntu/app',
         key_path, user, host
     )
     if out == 'ubuntu:ubuntu 755':
-        return True, "App directory configured"
-    return False, f"Invalid permissions: {out if out else 'Check failed'}"
+        return True, "Node.js app directory configured"
+    return False, f"Invalid permissions: {out}"
 
 def verify_app_files(key_path, user, host):
-    """Verify application files copied"""
+    """Verify Node.js application files copied"""
     out, err = run_remote_command(
         "[ -f /home/ubuntu/app/app.js ] && [ -f /home/ubuntu/app/package.json ] && echo exists",
         key_path, user, host
     )
     if out == 'exists':
-        return True, "Application files present"
-    return False, "Missing application files"
+        return True, "Node.js files present"
+    return False, "Missing Node.js files"
 
 def verify_dependencies(key_path, user, host):
-    """Verify npm dependencies installed"""
+    """Verify Node.js dependencies installed"""
     out, err = run_remote_command(
         "test -d /home/ubuntu/app/node_modules && echo exists",
         key_path, user, host
     )
     if out == 'exists':
-        return True, "Dependencies installed"
-    return False, "node_modules missing"
+        return True, "Node.js dependencies installed"
+    return False, "Node.js node_modules missing"
 
-def verify_app_running(host):
-    """Verify application responds on port 5000"""
+def verify_systemd_service(key_path, user, host):
+    """Verify systemd service file exists"""
+    out, err = run_remote_command(
+        "[ -f /etc/systemd/system/node_app.service ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "Systemd service created"
+    return False, "Systemd service missing"
+
+def verify_service_running(key_path, user, host):
+    """Verify Node.js service is active"""
+    out_active, err = run_remote_command(
+        "systemctl is-active node_app",
+        key_path, user, host
+    )
+    out_enabled, err = run_remote_command(
+        "systemctl is-enabled node_app",
+        key_path, user, host
+    )
+    if out_active == 'active' and out_enabled == 'enabled':
+        return True, "Service running and enabled"
+    return False, f"Service state: active={out_active}, enabled={out_enabled}"
+
+def verify_react_app_directory(key_path, user, host):
+    """Verify React app directory exists"""
+    out, err = run_remote_command(
+        "[ -d /home/ubuntu/react-app ] && echo exists",
+        key_path, user, host
+    )
+    if out != "exists":
+        return False, "React app directory missing"
+    out, err = run_remote_command(
+        'stat -c "%U:%G %a" /home/ubuntu/react-app',
+        key_path, user, host
+    )
+    if out == 'ubuntu:ubuntu 755':
+        return True, "React app directory configured"
+    return False, f"Invalid permissions: {out}"
+
+def verify_react_files_copied(key_path, user, host):
+    """Verify React files copied"""
+    out, err = run_remote_command(
+        "[ -f /home/ubuntu/react-app/package.json ] && [ -d /home/ubuntu/react-app/src ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "React files present"
+    return False, "Missing React files"
+
+def verify_react_dependencies(key_path, user, host):
+    """Verify React dependencies installed"""
+    out, err = run_remote_command(
+        "test -d /home/ubuntu/react-app/node_modules && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "React dependencies installed"
+    return False, "React node_modules missing"
+
+def verify_react_build_directory(key_path, user, host):
+    """Verify React build directory exists"""
+    out, err = run_remote_command(
+        "[ -d /home/ubuntu/react-app/build ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "React build directory exists"
+    return False, "React build directory missing"
+
+def verify_react_static_directory(key_path, user, host):
+    """Verify static files directory"""
+    out, err = run_remote_command(
+        "[ -d /var/www/react-app ] && echo exists",
+        key_path, user, host
+    )
+    if out != "exists":
+        return False, "Static directory missing"
+    out, err = run_remote_command(
+        'stat -c "%U:%G %a" /var/www/react-app',
+        key_path, user, host
+    )
+    if out == 'ubuntu:ubuntu 755':
+        return True, "Static directory configured"
+    return False, f"Invalid permissions: {out}"
+
+def verify_react_build_deployed(key_path, user, host):
+    """Verify React build deployed"""
+    out, err = run_remote_command(
+        "[ -f /var/www/react-app/index.html ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "React build deployed"
+    return False, "React build files missing"
+
+def verify_nginx_config(key_path, user, host):
+    """Verify Nginx configuration"""
+    out, err = run_remote_command(
+        "[ -f /etc/nginx/sites-available/react_node.conf ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "Nginx config present"
+    return False, "Nginx config missing"
+
+def verify_nginx_site_enabled(key_path, user, host):
+    """Verify Nginx site enabled"""
+    out, err = run_remote_command(
+        "[ -L /etc/nginx/sites-enabled/react_node.conf ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "Nginx site enabled"
+    return False, "Nginx site not enabled"
+
+def verify_nginx_default_site_removed(key_path, user, host):
+    """Verify default Nginx site removed"""
+    out, err = run_remote_command(
+        "[ ! -f /etc/nginx/sites-enabled/default ] && echo exists",
+        key_path, user, host
+    )
+    if out == 'exists':
+        return True, "Default site removed"
+    return False, "Default site present"
+
+def verify_nginx_running(key_path, user, host):
+    """Verify Nginx service status"""
+    out, err = run_remote_command("systemctl is-active nginx", key_path, user, host)
+    if out == 'active':
+        return True, "Nginx running"
+    return False, f"Nginx not running: {out}"
+
+def verify_api_proxy(host):
+    """Verify API accessible via Nginx proxy"""
     try:
-        response = requests.get(f"http://{host}:5000", timeout=5)
+        response = requests.get(f"http://{host}/api", timeout=5)
         if response.text.strip() == 'Node-Express App using Ansible':
-            return True, "Application accessible"
-        return False, "Unexpected response content"
+            return True, "API accessible via Nginx"
+        return False, "Unexpected API response"
     except Exception as e:
-        return False, f"Connection failed: {str(e)}"
+        return False, f"API connection failed: {str(e)}"
+
+def verify_react_frontend(host):
+    """Verify React frontend accessible"""
+    try:
+        response = requests.get(f"http://{host}", timeout=5)
+        if '<div id="root"></div>' in response.text:
+            return True, "React frontend served"
+        return False, "React content not found"
+    except Exception as e:
+        return False, f"Frontend connection failed: {str(e)}"
 
 def main():
     overall = {"data": []}
@@ -140,12 +279,11 @@ def main():
     try:
         ec2_host, user, key_path = parse_inventory()
     except Exception as e:
-        # If inventory parsing fails, fail all tests
         test_result = {
             "testid": "Inventory Configuration",
             "status": "failure",
             "score": 0,
-            "maximum marks": 8,
+            "maximum marks": 1,
             "message": f"Inventory error: {str(e)}"
         }
         overall["data"].append(test_result)
@@ -153,7 +291,6 @@ def main():
             json.dump(overall, f, indent=4)
         return
 
-    # Run Ansible playbook first
     playbook_cmd = f"ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory/inventory.ini playbook.yml"
     pb_out, pb_err = execute_command(playbook_cmd)
     
@@ -183,26 +320,104 @@ def main():
             "maximum_marks": 1
         },
         {
-            "testid": "Create app directory",
+            "testid": "Create Node.js app directory",
             "verify_function": verify_app_directory,
             "args": (key_path, user, ec2_host),
             "maximum_marks": 1
         },
         {
-            "testid": "Copy application files",
+            "testid": "Copy Node.js files",
             "verify_function": verify_app_files,
             "args": (key_path, user, ec2_host),
             "maximum_marks": 1
         },
         {
-            "testid": "Install dependencies",
+            "testid": "Install Node.js dependencies",
             "verify_function": verify_dependencies,
             "args": (key_path, user, ec2_host),
             "maximum_marks": 1
         },
         {
-            "testid": "Application running on port 5000",
-            "verify_function": verify_app_running,
+            "testid": "Create systemd service",
+            "verify_function": verify_systemd_service,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Enable Node.js service",
+            "verify_function": verify_service_running,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Create React app directory",
+            "verify_function": verify_react_app_directory,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Copy React files",
+            "verify_function": verify_react_files_copied,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Install React dependencies",
+            "verify_function": verify_react_dependencies,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Build React application",
+            "verify_function": verify_react_build_directory,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Create static directory",
+            "verify_function": verify_react_static_directory,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Deploy React build",
+            "verify_function": verify_react_build_deployed,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Configure Nginx",
+            "verify_function": verify_nginx_config,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Enable Nginx site",
+            "verify_function": verify_nginx_site_enabled,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Remove default site",
+            "verify_function": verify_nginx_default_site_removed,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "Nginx service status",
+            "verify_function": verify_nginx_running,
+            "args": (key_path, user, ec2_host),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "API accessibility",
+            "verify_function": verify_api_proxy,
+            "args": (ec2_host,),
+            "maximum_marks": 1
+        },
+        {
+            "testid": "React frontend accessibility",
+            "verify_function": verify_react_frontend,
             "args": (ec2_host,),
             "maximum_marks": 1
         }
@@ -228,12 +443,10 @@ def main():
         
         data.append(test_result)
 
-    # Save results
     overall['data'] = data
     with open('evaluate.json', 'w') as f:
         json.dump(overall, f, indent=4)
 
 if __name__ == "__main__":
-    # Set strict permissions for the private key
     os.chmod('inventory/ansible.pem', 0o400)
     main()

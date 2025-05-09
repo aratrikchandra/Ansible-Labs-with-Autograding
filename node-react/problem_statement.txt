@@ -1,0 +1,123 @@
+Problem Statement for Ansible Lab: Deploy Node.js Backend + React Frontend on AWS EC2  
+
+Objective: Deploy a Full stack application (Node.js backend + React frontend) on an AWS EC2 Ubuntu 22.04 instance using Ansible. Configure Nginx to serve the React app on port 80 and proxy API requests to the Node.js backend.  
+
+---
+
+Steps to Complete:  
+1. Set Up AWS EC2 Instance:  
+   - Launch Ubuntu 22.04 instance (manually or via Terraform).  
+   - Configure security group to allow:  
+     - Port 80 (HTTP access for React frontend)  
+     - Port 22 (SSH for Ansible)  
+
+2. Configure Ansible Inventory:  
+   - Edit `inventory/inventory.ini` with:  
+     - EC2 instance public IP  
+     - `ubuntu` as the user  
+     - Path to SSH private key (`ansible.pem`)  
+   - Example:  
+     ```  
+     [webserver]  
+     54.210.12.34 ansible_user=ubuntu ansible_ssh_private_key_file=inventory/ansible.pem  
+     ```  
+   - Paste your AWS private key into `inventory/ansible.pem`.  
+
+3. Complete the Ansible Playbook:  
+   - Edit `playbook.yml` to:  
+     - Target the `webserver` group  
+     - Enable privilege escalation (`become: yes`)  
+     - Assign the `deploy_node_app` role  
+
+4. Finish the Role Tasks:  
+   - Edit `roles/deploy_node_app/tasks/main.yml` to implement:  
+     - Node.js backend setup  
+     - React frontend build/deployment  
+     - Nginx reverse proxy configuration  
+
+---
+
+Provided Files & Their Purpose:  
+
+1. Application Code:  
+   - Backend:  
+     - `app/app.js`: Express.js server on port 5000 with `/api` endpoint  
+     - `app/package.json`: Defines dependencies (Express, Body-Parser)  
+   - Frontend:  
+     - `client/`: React application with API integration  
+     - `client/package.json`: React dependencies and build scripts  
+
+2. Ansible Configuration:  
+   - `inventory.ini`: Defines target server connection details  
+   - `playbook.yml`: Master playbook to execute the deployment role  
+
+3. Role Components:  
+   - Systemd Service:  
+     - `files/node_app.service`: Runs Node.js app as background service under `ubuntu` user  
+   - Nginx Template:  
+     - `templates/react_node.conf.j2`: Configures:  
+       - Port 80 listener  
+       - Static file serving from `/var/www/react-app` (React build)  
+       - Proxy to Node.js backend at `localhost:5000` for `/api` routes  
+   - Tasks:  
+     - Partially written `tasks/main.yml` with placeholders for:  
+       - Package installation (Node.js, npm, Nginx)  
+       - File transfers (app/client code)  
+       - Dependency installation  
+       - React build process  
+       - Nginx configuration  
+
+---
+
+Tasks to Complete in `tasks/main.yml`:  
+
+1. Server Setup:  
+   - Install prerequisites: `curl`, `ca-certificates`, `gnupg`, `nginx`  
+   - Add NodeSource repository for Node.js 22.x  
+   - Install Node.js and npm v10.9.2  
+
+2. Node.js Backend:  
+   - Create `/home/ubuntu/app` directory  
+   - Copy `app/` code to EC2  
+   - Install backend dependencies  
+   - Configure systemd service (`node_app.service`)  
+
+3. React Frontend:  
+   - Create `/home/ubuntu/react-app` directory  
+   - Copy `client/` code to EC2  
+   - Install React dependencies  
+   - Build production version (`npm run build`)  
+   - Deploy build to `/var/www/react-app`  
+
+4. Nginx Configuration:  
+   - Deploy `react_node.conf.j2` template  
+   - Enable site by creating symlink in `sites-enabled`  
+   - Remove default Nginx site  
+   - Restart Nginx  
+
+---
+
+Key Ansible Concepts Required:  
+1. Inventory: Define target hosts with IP/SSH credentials.  
+2. Playbooks: Coordinate roles and privilege escalation.  
+3. Modules:  
+   - `apt`: Install system packages (Node.js, Nginx)  
+   - `copy`: Transfer app/client code to EC2  
+   - `npm`: Manage Node.js dependencies  
+   - `template`: Generate Nginx config from .j2 file  
+   - `systemd`: Manage Node.js service  
+   - `file`: Create directories/configure permissions  
+4. Roles: Modularize tasks/files/templates.  
+
+---
+
+Validation:  
+- Successful deployment allows:  
+  - React frontend at `http://<EC2_IP>`  
+  - Node.js API accessible via `http://<EC2_IP>/api`  
+- Nginx must:  
+  - Serve static React files from `/var/www/react-app`  
+  - Proxy `/api` requests to `localhost:5000`  
+- Services must survive server reboots (systemd + Nginx enabled).  
+
+Note: All tasks must be idempotent. Use `creates` in the NodeSource `shell` task to avoid duplicate repository setup. Test React build with `NODE_OPTIONS: --openssl-legacy-provider` if needed.

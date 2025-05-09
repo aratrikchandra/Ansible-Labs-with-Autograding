@@ -1,0 +1,151 @@
+{
+    "data": [
+        {
+            "testid": "Install prerequisites",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "All prerequisites installed"
+        },
+        {
+            "testid": "Add NodeSource repository",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "NodeSource repo configured"
+        },
+        {
+            "testid": "Install Node.js",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Node.js v22.15.0 installed"
+        },
+        {
+            "testid": "Install npm 10.9.2",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "npm 10.9.2 installed"
+        },
+        {
+            "testid": "Create Node.js app directory",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Node.js app directory configured"
+        },
+        {
+            "testid": "Copy Node.js files",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Node.js files present"
+        },
+        {
+            "testid": "Install Node.js dependencies",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Node.js dependencies installed"
+        },
+        {
+            "testid": "Create systemd service",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Systemd service created"
+        },
+        {
+            "testid": "Enable Node.js service",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Service running and enabled"
+        },
+        {
+            "testid": "Create React app directory",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React app directory configured"
+        },
+        {
+            "testid": "Copy React files",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React files present"
+        },
+        {
+            "testid": "Install React dependencies",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React dependencies installed"
+        },
+        {
+            "testid": "Build React application",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React build directory exists"
+        },
+        {
+            "testid": "Create static directory",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Static directory configured"
+        },
+        {
+            "testid": "Deploy React build",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React build deployed"
+        },
+        {
+            "testid": "Configure Nginx",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Nginx config present"
+        },
+        {
+            "testid": "Enable Nginx site",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Nginx site enabled"
+        },
+        {
+            "testid": "Remove default site",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Default site removed"
+        },
+        {
+            "testid": "Nginx service status",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Nginx running"
+        },
+        {
+            "testid": "API accessibility",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "API accessible via Nginx"
+        },
+        {
+            "testid": "React frontend accessibility",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "React frontend served"
+        }
+    ]
+}

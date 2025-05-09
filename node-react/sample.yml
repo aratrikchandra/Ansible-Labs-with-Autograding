@@ -1,0 +1,73 @@
+---
+- name: Update package cache
+  # add your code here
+
+- name: Install prerequisites
+  # add your code here
+
+- name: Add NodeSource repository for Node.js 22.x
+  # add your code here
+
+- name: Install Node.js
+  # add your code here
+
+- name: Install specific npm version
+  # add your code here
+
+# Node.js Backend Setup
+- name: Create app directory
+  # add your code here
+
+- name: Copy application files
+  # add your code here
+
+- name: Install dependencies
+  # add your code here
+
+- name: Create systemd service
+  # add your code here
+
+- name: Enable and start service
+  # add your code here
+
+# React Frontend Setup
+- name: Create React app directory
+  # add your code here
+
+- name: Copy React application files
+  # add your code here
+
+- name: Install React dependencies
+  # add your code here
+
+- name: Build React application
+  # add your code here
+
+- name: Verify build directory exists
+  stat:
+    path: /home/ubuntu/react-app/build
+  register: build_dir
+
+- name: Fail if build directory missing
+  fail:
+    msg: "React build directory not found - build failed"
+  when: not build_dir.stat.exists
+
+- name: Create directory for React static files
+  # add your code here
+
+- name: Deploy React build
+  # add your code here
+
+# Nginx Configuration
+- name: Configure Nginx
+  # add your code here
+
+- name: Enable Nginx site
+  # add your code here
+
+- name: Remove default Nginx site
+  # add your code here
+
+- name: Restart Nginx
+  # add your code here
