@@ -1,0 +1,140 @@
+---
+- name: Update package cache
+  apt:
+    update_cache: yes
+
+- name: Install prerequisites
+  apt:
+    name: [curl, ca-certificates, gnupg, nginx]
+    state: present
+
+- name: Add NodeSource repository for Node.js 22.x
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install specific npm version
+  npm:
+    name: npm
+    global: yes
+    version: 10.9.2
+
+# Node.js Backend Setup
+- name: Create app directory
+  file:
+    path: /home/ubuntu/app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy application files
+  copy:
+    src: "../../../app/"
+    dest: /home/ubuntu/app/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install dependencies
+  npm:
+    path: /home/ubuntu/app
+    production: yes
+
+- name: Create systemd service
+  copy:
+    src: node_app.service
+    dest: /etc/systemd/system/node_app.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable and start service
+  systemd:
+    name: node_app
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# React Frontend Setup
+- name: Create React app directory
+  file:
+    path: /home/ubuntu/react-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy React application files
+  copy:
+    src: "../../../client/"
+    dest: /home/ubuntu/react-app/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install React dependencies
+  npm:
+    path: /home/ubuntu/react-app
+    state: present
+
+- name: Build React application
+  command: npm run build
+  args:
+    chdir: /home/ubuntu/react-app
+  environment:
+    NODE_OPTIONS: --openssl-legacy-provider
+
+- name: Verify build directory exists
+  stat:
+    path: /home/ubuntu/react-app/build
+  register: build_dir
+
+- name: Fail if build directory missing
+  fail:
+    msg: "React build directory not found - build failed"
+  when: not build_dir.stat.exists
+
+- name: Create directory for React static files
+  file:
+    path: /var/www/react-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Deploy React build
+  copy:
+    src: /home/ubuntu/react-app/build/
+    dest: /var/www/react-app/
+    owner: ubuntu
+    group: ubuntu
+    remote_src: yes
+
+# Nginx Configuration
+- name: Configure Nginx
+  template:
+    src: react_node.conf.j2
+    dest: /etc/nginx/sites-available/react_node.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/react_node.conf
+    dest: /etc/nginx/sites-enabled/react_node.conf  # Add specific filename
+    state: link
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
+    enabled: yes
