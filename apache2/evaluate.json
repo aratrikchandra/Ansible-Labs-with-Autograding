@@ -1,0 +1,39 @@
+{
+    "data": [
+        {
+            "testid": "Inventory Configuration",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "SSH connection successful using inventory details."
+        },
+        {
+            "testid": "Apache2 Installation",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Apache2 installed: Server version: Apache/2.4.52 (Ubuntu)"
+        },
+        {
+            "testid": "Apache Service Running",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Apache2 service is running."
+        },
+        {
+            "testid": "index.html Deployment",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "index.html is correctly deployed."
+        },
+        {
+            "testid": "Website Accessibility",
+            "status": "success",
+            "score": 1,
+            "maximum marks": 1,
+            "message": "Website content is correct."
+        }
+    ]
+}

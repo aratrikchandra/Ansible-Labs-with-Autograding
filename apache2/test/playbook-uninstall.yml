@@ -1,0 +1,33 @@
+---
+- name: Uninstall Apache2 and clean up
+  hosts: all
+  become: yes
+  roles:
+    - uninstall-apache
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

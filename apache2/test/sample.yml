@@ -1,0 +1,6 @@
+---
+- name: Install apache httpd
+  # add your code here
+
+- name: Copy file with owner and permissions
+  # add your code here

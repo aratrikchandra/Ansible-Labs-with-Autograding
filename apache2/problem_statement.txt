@@ -1,0 +1,97 @@
+Automate Apache2 Deployment on AWS using Ansible  
+
+Objective  
+Your task is to automate the deployment of a web server on an AWS EC2 instance using Ansible. You will configure the instance, set up Apache2, and deploy a simple website.  
+
+---  
+
+Lab Setup Requirements  
+1. AWS EC2 Instance:  
+   - Launch an Ubuntu 22.04 instance on AWS.  
+   - Configure a security group to allow:  
+     - SSH access (port 22) from anywhere (`0.0.0.0/0`).  
+     - HTTP access (port 80) from anywhere (`0.0.0.0/0`).  
+   - Save the SSH private key (`ansible.pem`) to the `inventory/` directory.  
+
+2. Ansible Configuration:  
+   - Configure the `inventory/inventory.ini` file to connect to your EC2 instance. Use the provided SSH key and the correct Ansible user.  
+   - Write an Ansible playbook (`playbook.yml`) that uses a role to:  
+     - Install Apache2.  
+     - Copy the provided `index.html` file to the web server directory.  
+
+3. Website Deployment:  
+   - Ensure the `index.html` file (provided in `roles/install-apache/tasks/`) is deployed to `/var/www/html/` with proper ownership and permissions.  
+
+---  
+
+Folder Structure  
+```  
+.  
+├── inventory  
+│   ├── ansible.pem          <-- EC2 private key (you must place it here)  
+│   └── inventory.ini                <-- Define your EC2 instance connection details here  
+├── playbook.yml     <-- Ansible playbook to trigger the role  
+└── roles  
+    ├── install-apache  
+    │   └── tasks  
+    │       ├── index.html   <-- Pre-written HTML file (do not modify)  
+    │       └── main.yml     <-- Define tasks for Apache setup here  
+```  
+
+---  
+
+Tasks to Complete  
+1. Configure the Inventory File:  
+   - In `inventory/inventory.ini`, define your EC2 instance’s public DNS under the `[apacheserver]` group.  
+   - Specify the SSH private key path and the Ansible user (ubuntu).  
+
+2. Write the Playbook:  
+   - Complete `playbook.yml` to execute the `install-apache` role on all hosts.  
+
+3. Define the Role Tasks:  
+   - In `roles/install-apache/tasks/main.yml`, add tasks to:  
+     - Install Apache2 using the `apt` module.  
+     - Copy `index.html` to `/var/www/html/` with `ubuntu` ownership under 'ubuntu' group and permission `0644`.  
+
+---  
+
+Validation Steps  
+After completing the tasks:  
+1. Run the playbook:  
+   ```  
+   ansible-playbook -i inventory/inventory.ini playbook.yml
+   ```  
+2. Verify the website is accessible at:  
+   `http://<EC2_Public_IP>`  
+3. Confirm Apache2 is installed and running on the EC2 instance.  
+
+Step 1: Check Installation
+Run the following command to see if Apache2 is installed:
+   ```  
+   apache2 -v
+   ```  
+This should display the version of Apache2. If you receive a "command not found" error, Apache2 is not installed.
+
+Step 2: Check Service Status
+Verify if the Apache2 service is running:
+   ```  
+   sudo systemctl status apache2
+   ```  
+Sample success output(Look for a status like "active(running)" in the output):
+● apache2.service - The Apache HTTP Server
+   Loaded: loaded (/lib/systemd/system/apache2.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2025-04-01 23:59:02 IST; 5min ago
+     Docs: https://httpd.apache.org/docs/2.4/
+ Main PID: 1234 (apache2)
+    Tasks: 6 (limit: 4915)
+   Memory: 15.3M
+   CGroup: /system.slice/apache2.service
+           ├─1234 /usr/sbin/apache2 -k start
+           ├─1235 /usr/sbin/apache2 -k start
+           └─1236 /usr/sbin/apache2 -k start
+
+---  
+Success Criteria  
+- The EC2 instance is reachable via Ansible.  
+- Apache2 is installed, and the service is running.  
+- The `index.html` file is served correctly via the web server.  
