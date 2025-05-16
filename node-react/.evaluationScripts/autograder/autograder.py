@@ -287,7 +287,7 @@ def main():
             "message": f"Inventory error: {str(e)}"
         }
         overall["data"].append(test_result)
-        with open('evaluate.json', 'w') as f:
+        with open('../evaluate.json', 'w') as f:
             json.dump(overall, f, indent=4)
         return
 
@@ -444,9 +444,9 @@ def main():
         data.append(test_result)
 
     overall['data'] = data
-    with open('evaluate.json', 'w') as f:
+    with open('../evaluate.json', 'w') as f:
         json.dump(overall, f, indent=4)
 
 if __name__ == "__main__":
-    os.chmod('inventory/ansible.pem', 0o400)
+    os.chmod('inventory/ansible.pem', 0o600)
     main()

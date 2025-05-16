@@ -1,5 +1,0 @@
----
-- hosts: webserver
-  become: yes
-  roles:
-    - deploy_node_app

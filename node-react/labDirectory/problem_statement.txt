@@ -1,0 +1,214 @@
+Deploy a Full-Stack Node.js and React Application on AWS EC2 using Ansible
+
+Objective:  
+Automate the deployment of a full-stack web application (Node.js backend + React frontend) on an AWS EC2 Ubuntu 22.04 instance using Ansible. Configure Nginx as a reverse proxy to:  
+- Serve the React frontend on port 80  
+- Proxy API requests to the Node.js backend
+
+---
+
+ Steps to Complete  
+
+ 1. AWS EC2 Instance Setup  
+- Launch an Ubuntu 22.04 instance.  
+- Configure the security group to allow:  
+  - Inbound HTTP (port 80) for public web access  
+  - Inbound SSH (port 22) for Ansible connectivity  
+
+ 2. Ansible Inventory Configuration  
+- Edit `inventory/inventory.ini`:  
+  - Add the EC2 instance’s public IP address under the `[webserver]` group.  
+  - Specify the SSH user as `ubuntu`.  
+  - Provide the absolute path to the private key file (`ansible.pem`).  
+  - Example format:  
+    ```  
+    [webserver]  
+    203.0.113.45 ansible_user=ubuntu ansible_ssh_private_key_file=inventory/ansible.pem  
+    ```  
+- Save your AWS private key to `inventory/ansible.pem` with strict permissions (chmod 400).  
+
+ 3. Ansible Playbook Setup  
+- Edit `playbook.yml`:  
+  - Target the `webserver` host group.  
+  - Enable privilege escalation (`become: yes`) for root-level tasks.  
+  - Assign the `deploy_node_app` role to execute all deployment tasks.  
+
+ 4. Complete the Ansible Role Tasks  
+Edit `roles/deploy_node_app/tasks/main.yml` to implement the following:  
+
+ Section 1: Server Setup & Dependency Installation  
+- Update the package cache to ensure fresh package listings.  
+- Install system prerequisites:  
+  - Tools: `curl`, `gnupg` (for repository management)  
+  - Security: `ca-certificates`  
+  - Web server: `nginx`  
+- Add the NodeSource repository for Node.js 22.x using an official setup script.  
+  - Use a shell command to execute the NodeSource installation script.  
+  - Ensure the task is idempotent (does not rerun if already configured).  
+- Install Node.js 22.x using the package manager.  
+- Install npm version 10.9.2 globally.  
+
+ Section 2: Node.js Backend Deployment  
+- Create a directory `/home/ubuntu/app` with ownership set to `ubuntu`.  
+- Copy the backend code from the local `app/` folder to `/home/ubuntu/app/` on the EC2 instance.  
+  - Ensure proper file permissions for the `ubuntu` user.  
+- Install backend dependencies from `package.json` using npm.  
+  - Use production mode to skip dev dependencies.  
+- Deploy the systemd service `node_app.service` to manage the Node.js application.  
+  - Copy the provided service file to `/etc/systemd/system/`.  
+  - Ensure the service starts automatically on boot and is immediately activated.  
+
+ Section 3: React Frontend Deployment  
+- Create a directory `/home/ubuntu/react-app` with `ubuntu` ownership.  
+- Copy the React application from the local `client/` folder to `/home/ubuntu/react-app/`.  
+- Install React dependencies using npm.  
+- Build the React application for production.  
+  - Execute `npm run build` in the React app directory.  
+  - Handle potential build errors (e.g., legacy OpenSSL issues).  
+- Verify the build directory `/home/ubuntu/react-app/build` exists.  
+  - Fail the playbook if the build fails.  
+- Create a directory `/var/www/react-app` to host static files.  
+- Deploy the React build by copying the contents of `build/` to `/var/www/react-app/`.  
+
+ Section 4: Nginx Reverse Proxy Configuration  
+- Generate the Nginx configuration using the provided Jinja2 template `react_node.conf.j2`.  
+  - Place the final config in `/etc/nginx/sites-available/`.  
+- Enable the site by creating a symbolic link in `/etc/nginx/sites-enabled/`.  
+- Remove the default Nginx site to avoid conflicts.  
+- Restart Nginx to apply changes.  
+
+---
+
+ Provided Files & Their Role  
+
+ Application Code  
+- Backend:  
+  - `app/app.js`: Express server listening on `0.0.0.0:5000` with an `/api` endpoint.  
+  - `app/package.json`: Specifies dependencies (Express, Body-Parser) and the `start` script.  
+- Frontend:  
+  - `client/`: React app with API integration.  
+  - `client/package.json`: Includes React dependencies and build scripts.  
+
+ Ansible Configuration  
+- `inventory.ini`: Defines connection details for the EC2 instance.  
+- `playbook.yml`: Orchestrates the deployment workflow.  
+
+ Role Components  
+- Systemd Service:  
+  - `files/node_app.service`: Configures the Node.js app as a background service:  
+    - Runs as the `ubuntu` user  
+    - Sets the working directory to `/home/ubuntu/app`  
+    - Uses `npm start` to launch the app  
+- Nginx Template:  
+  - `templates/react_node.conf.j2`: Reverse proxy configuration:  
+    - Serves static files from `/var/www/react-app`  
+    - Proxies `/api` requests to `http://localhost:5000`  
+    - Listens on port 80  
+- Partially Complete Tasks:  
+  - `tasks/main.yml` includes placeholders for critical steps (marked with ` add your code here`).  
+
+---
+Validation Criteria  
+After completing the tasks, run the playbook:  
+```bash  
+ansible-playbook -i inventory/inventory.ini playbook.yml  
+```  
+Your solution will be graded based on the following checks. You can manually verify these via SSH:  
+Critical Tip: Use `ssh -i inventory/ansible.pem ubuntu@<EC2_IP>` to connect to your EC2 instance.
+---
+
+ 1. React Frontend Accessibility  
+To Verify:  
+```bash  
+ Check if React build files exist  
+ls /var/www/react-app  
+
+ Test HTTP response (replace <EC2_IP> with your instance IP)  
+curl http://localhost   From EC2  
+curl http://<EC2_IP>    From your local machine  
+```  
+- Expected Result:  
+  - `/var/www/react-app` must contain `index.html` and static assets.  
+  - HTTP response should include React UI elements (e.g., `<div id="root"></div>`).  
+
+---
+
+ 2. Backend API Functionality  
+To Verify:  
+```bash  
+ Check Node.js service status  
+systemctl is-active node_app  
+systemctl is-enabled node_app  
+
+ Test API endpoint  
+curl http://localhost:5000/api         From EC2  
+curl http://<EC2_IP>/api                From local machine  
+```  
+- Expected Result:  
+  - Service status: active (running) and enabled.  
+  - API response: `Node-Express App using Ansible`.  
+
+---
+
+ 3. Nginx Configuration  
+To Verify:  
+```bash  
+ Check configuration files  
+ls /etc/nginx/sites-available/react_node.conf  
+ls /etc/nginx/sites-enabled/react_node.conf  
+
+ Verify default site is removed  
+ls /etc/nginx/sites-enabled/default  
+
+ Test Nginx syntax  
+sudo nginx -t  
+```  
+- Expected Result:  
+  - `react_node.conf` exists in both `sites-available` and `sites-enabled`.  
+  - `default` file must not exist in `sites-enabled`.  
+  - `nginx -t` reports syntax is OK.  
+
+---
+
+ 4. Service Reliability  
+To Verify:  
+```bash  
+ Check Nginx status  
+systemctl is-active nginx  
+systemctl is-enabled nginx  
+
+ Simulate reboot (optional)  
+sudo reboot  
+ After reboot, recheck services:  
+systemctl is-active nginx  
+systemctl is-active node_app  
+```  
+- Expected Result:  
+  - Both Nginx and `node_app` services must be active and enabled.  
+
+---
+
+ 5. File Permissions & Dependencies  
+To Verify:  
+```bash  
+ Check directory ownership (repeat for /home/ubuntu/app and /var/www/react-app)  
+stat -c "%U:%G" /home/ubuntu/react-app  
+
+ Verify Node.js and npm versions  
+node --version   Should start with v22.x  
+npm --version    Must be 10.9.2  
+
+ Check React dependencies  
+ls /home/ubuntu/react-app/node_modules  
+
+ Verify build directory  
+ls /home/ubuntu/react-app/build  
+```  
+- Expected Result:  
+  - All directories owned by `ubuntu:ubuntu`.  
+  - Node.js v22.x and npm 10.9.2 installed.  
+  - `node_modules` and `build` directories exist.  
+--- 
+
+Create an IAM user for the instructor for evaluation
+For the purpose of checking your code's correctness, you need to create an AWS IAM user for the instructor and attach it with the policy instructor_iam_policy.json which is present inside labDirectory. You will then generate the access keys for the user. Those access keys will be used by the instructor to make programmatic calls to AWS services via AWS CLI or APIs. Fill 1) Access key ID and 2)SECRET_ACCESS_KEY for the Instructor IAM user account in the data.json file which is present in the labDirectory.
