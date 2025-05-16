@@ -183,10 +183,10 @@ def main():
 
     # Save results
     overall['data'] = data
-    with open('evaluate.json', 'w') as f:
+    with open('../evaluate.json', 'w') as f:
         json.dump(overall, f, indent=4)
 
 if __name__ == "__main__":
     # Set strict permissions for the private key
-    os.chmod('inventory/ansible.pem', 0o400)
+    os.chmod('inventory/ansible.pem', 0o600)
     main()

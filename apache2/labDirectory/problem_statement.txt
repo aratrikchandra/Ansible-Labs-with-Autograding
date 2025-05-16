@@ -1,7 +1,5 @@
-Automate Apache2 Deployment on AWS using Ansible  
-
 Objective  
-Your task is to automate the deployment of a web server on an AWS EC2 instance using Ansible. You will configure the instance, set up Apache2, and deploy a simple website.  
+Your task is to automate the deployment of a web server on an AWS EC2 instance using Ansible. You will configure the instance, set up Apache2, and deploy a simple website.
 
 ---  
 
@@ -91,7 +89,7 @@ Sample success output(Look for a status like "active(running)" in the output):
            └─1236 /usr/sbin/apache2 -k start
 
 ---  
-Success Criteria  
-- The EC2 instance is reachable via Ansible.  
-- Apache2 is installed, and the service is running.  
-- The `index.html` file is served correctly via the web server.  
+Step 3: Create an IAM user for the instructor for evaluation
+For the purpose of checking your code's correctness, you need to create an AWS IAM user for the instructor and attach it with the policy instructor_iam_policy.json which is present inside labDirectory. You will then generate the access keys for the user. Those access keys will be used by the instructor to make programmatic calls to AWS services via AWS CLI or APIs. Fill 1) Access key ID and 2)SECRET_ACCESS_KEY for the Instructor IAM user account in the data.json file which is present in the labDirectory.
+
+
