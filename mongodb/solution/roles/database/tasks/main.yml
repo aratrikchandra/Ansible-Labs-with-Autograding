@@ -1,0 +1,88 @@
+# roles/database/tasks/main.yml
+---
+- name: Install prerequisites
+  apt:
+    name: ["gnupg", "curl"]
+    state: present
+    update_cache: yes
+
+- name: Add MongoDB 8.0 repository
+  block:
+    - name: Ensure keyrings directory
+      file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+    
+    - name: Import MongoDB GPG key
+      shell: |
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg --batch -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+      args:
+        creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+    
+    - name: Add repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+        filename: mongodb-org-8.0.list
+        state: present
+
+- name: Install MongoDB 8.0.5 with exact versions
+  apt:
+    name:
+      - mongodb-org=8.0.5
+      - mongodb-org-database=8.0.5
+      - mongodb-org-server=8.0.5
+      - mongodb-org-shell=8.0.5
+      - mongodb-org-tools=8.0.5
+      - mongodb-mongosh=2.4.2
+    state: present
+    force: yes
+    update_cache: yes
+  notify: 
+    - daemon-reload
+    - restart mongodb
+
+- name: Create fresh MongoDB directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: mongodb
+    group: mongodb
+    mode: '0755'
+  loop:
+    - /var/lib/mongodb
+    - /var/log/mongodb
+
+- name: Configure MongoDB with idempotent template
+  template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: mongodb
+    group: mongodb
+    mode: '0644'
+  notify:
+    - daemon-reload
+    - restart mongodb
+
+- name: Ensure MongoDB is enabled and running
+  service:
+    name: mongod
+    state: started
+    enabled: yes
+
+- name: Wait for MongoDB to become ready
+  wait_for:
+    port: 27017
+    delay: 5
+    timeout: 60
+
+- name: Copy population script
+  copy:
+    src: populate.js
+    dest: /tmp/populate.js
+    mode: '0644'
+
+- name: Populate database
+  command: mongosh --quiet localhost:27017/MasterDB /tmp/populate.js
+  register: populate_result
+  changed_when: "'inserted' in populate_result.stdout"

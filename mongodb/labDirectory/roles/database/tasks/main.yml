@@ -1,0 +1,50 @@
+# roles/database/tasks/main.yml
+---
+- name: Install prerequisites
+  # add your code here
+
+- name: Add MongoDB 8.0 repository
+  block:
+    - name: Ensure keyrings directory
+      # add your code here
+    
+    - name: Import MongoDB GPG key
+      # add your code here
+    
+    - name: Add repository
+      # add your code here
+
+- name: Install MongoDB 8.0.5 with exact versions
+  # add your code here
+  notify: 
+    - daemon-reload
+    - restart mongodb
+
+- name: Create fresh MongoDB directories
+  # add your code here
+
+- name: Configure MongoDB with idempotent template
+  # add your code here
+  notify: 
+    - daemon-reload
+    - restart mongodb
+
+- name: Ensure MongoDB is enabled and running
+  # add your code here
+
+- name: Wait for MongoDB to become ready
+  wait_for:
+    port: 27017
+    delay: 5
+    timeout: 60
+
+- name: Copy population script
+  copy:
+    src: populate.js
+    dest: /tmp/populate.js
+    mode: '0644'
+
+- name: Populate database
+  command: mongosh --quiet localhost:27017/MasterDB /tmp/populate.js
+  register: populate_result
+  changed_when: "'inserted' in populate_result.stdout"

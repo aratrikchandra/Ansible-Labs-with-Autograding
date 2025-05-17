@@ -1,0 +1,189 @@
+Automate MongoDB Setup on EC2 Using Ansible
+
+Objective:
+Automate the installation and configuration of MongoDB 8.0.5 on an Ubuntu 22.04 EC2 instance using Ansible.
+---
+
+### Tasks to Complete
+
+1. Set Up EC2 Instance  
+   - Launch an EC2 instance with:  
+     - OS: Ubuntu 22.04 LTS  
+     - Instance type: `t2.micro`  
+     - Security group allowing SSH (port 22).  
+
+2. Configure Ansible Project Structure  
+   - Complete the following files:  
+     - `inventory/inventory.ini`: Define the EC2 instance’s public IP, SSH user (`ubuntu`), and path to the private key (`ansible.pem`).  
+     - `roles/database/tasks/main.yml`: Complete the Ansible tasks to install MongoDB, configure it, and populate the database.  
+     - `playbook.yml`: Assign the `database` role to the `DB-server` group.  
+
+3. Key Files to Edit  
+    `inventory.ini`:  
+     ```ini
+     [DB-server]
+     <EC2_PUBLIC_IP> ansible_user=<username> ansible_ssh_private_key_file=<path to the private key>
+     ```  
+     Replace `<EC2_PUBLIC_IP>` , `<username>`, `<path to the private key>` with correct details.  
+
+   - `tasks/main.yml`:  
+     Use Ansible modules to:  
+      1. Install Prerequisites
+      Use the apt module to install gnupg and curl.
+
+      Ensure the package cache is updated before installing these packages.
+
+      2. Add MongoDB 8.0 Repository
+      GPG Key Setup:
+
+      Use a block to group tasks related to repository setup.
+
+      a) Create the /usr/share/keyrings directory with proper permissions(0755) using the file module.
+
+      b) Securely Import MongoDB’s GPG Key:
+
+      c) Fetch the GPG key from https://www.mongodb.org/static/pgp/server-8.0.asc.
+
+      Use a shell command to download, validate, and save the key to /usr/share/keyrings/mongodb-server-8.0.gpg.
+
+      Ensure the task is idempotent by checking if the key file already exists.
+
+      Repository Configuration:
+
+      Use the apt_repository module to add the MongoDB 8.0 repository.
+
+      The repository entry must include:
+
+      Architecture (amd64,arm64).
+
+      Reference to the GPG key using signed-by.
+
+      Correct URL: https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse.
+
+      Save the repository configuration under a specific filename (e.g., mongodb-org-8.0.list).
+
+      3. Install MongoDB 8.0.5 with Exact Versions
+      Use the apt module to install specific package versions:
+
+      mongodb-org=8.0.5
+
+      mongodb-org-database=8.0.5
+
+      mongodb-org-server=8.0.5
+
+      mongodb-org-shell=8.0.5
+
+      mongodb-org-tools=8.0.5
+
+      mongodb-mongosh=2.4.2
+
+      Ensure the installation forces version consistency and updates the package cache.
+
+      Trigger handlers to reload the systemd daemon and restart MongoDB only if changes occur.
+
+      4. Configure MongoDB Directories
+      Use the file module to create:
+
+      /var/lib/mongodb (data storage).
+
+      /var/log/mongodb (log storage).
+
+      Set ownership to mongodb:mongodb and permissions to 0755.
+
+      Use a loop to avoid redundant code.
+
+      5. Generate MongoDB Configuration
+      Use the template module to deploy mongod.conf.j2 to /etc/mongod.conf.
+
+      Set the correct ownership (mongodb:mongodb) and permissions (0644).
+
+      Notify handlers to reload the systemd daemon and restart MongoDB if the configuration changes.
+
+      6. Manage MongoDB Service
+      Use the service module to ensure mongod is:
+
+      Started immediately.
+
+      Enabled to start on system boot. 
+
+   - `playbook.yml`:  
+     Ensure the playbook targets the `DB-server` group and uses the `database` role.  
+
+---
+
+### Provided Code Explanation  
+
+1. Handlers (`handlers/main.yml`)  
+   - `daemon-reload`: Reloads systemd after configuration changes.  
+   - `restart mongodb`: Restarts MongoDB and ensures it’s enabled.  
+   - These are triggered by `notify` in tasks (e.g., after installing MongoDB or updating `mongod.conf`).  
+
+2. Template (`templates/mongod.conf.j2`)  
+   - Configures MongoDB to:  
+     - Log to `/var/log/mongodb/mongod.log`.  
+     - Store data in `/var/lib/mongodb`.  
+     - Listen on port 27017 and bind to all network interfaces (`bindIpAll: true`).  
+
+3. Population Script (`files/populate.js`)  
+   - Clears the `Users` collection and inserts 20 sample documents into `MasterDB`.  
+   - The Ansible task runs this script using `mongosh` to ensure idempotency (only inserts data if it doesn’t exist).  
+
+---
+
+### Required Ansible Concepts  
+
+1. Roles: Organize tasks, handlers, and files into reusable components.  
+2. Modules:  
+   - `apt`: Install packages and manage repositories.  
+   - `file`: Create directories and set permissions.  
+   - `template`: Generate configuration files from Jinja2 templates.  
+   - `service`: Manage MongoDB service state (started/enabled).  
+   - `command`: Execute `mongosh` to run the population script.  
+3. Idempotency: Tasks should produce the same result on reruns (e.g., using `creates` in `shell` for the GPG key).  
+4. Handlers: Trigger actions (like restarting services) only when changes occur.  
+
+---
+
+### Execution Steps  
+
+1. Update `inventory.ini`  
+   - Replace `<EC2_PUBLIC_IP>` with your instance’s IP.  
+   - Place the SSH private key (`ansible.pem`) in the `inventory/` directory.  
+
+2. Run the Playbook  
+   ```bash
+   ansible-playbook -i inventory/inventory.ini playbook.yml
+   ```  
+
+3. Verify the Setup  
+   - SSH into the EC2 instance:  
+     ```bash
+     ssh -i inventory/ansible.pem ubuntu@<EC2_IP>
+     ```  
+   - Check MongoDB status:  
+     ```bash
+     systemctl status mongod
+     ```  
+     Expected Output:
+     ● mongod.service - MongoDB Database Server
+   Loaded: loaded (/lib/systemd/system/mongod.service; enabled; vendor preset: enabled)
+   Active: active (running) since ...  # <-- GREEN "active (running)"
+   Main PID: 1234 (mongod)
+     Tasks: 12 (limit: 4567)
+   Memory: 45.6M
+   CGroup: /system.slice/mongod.service
+           └─1234 /usr/bin/mongod ... --port 27017
+   - Confirm data insertion:  
+     ```bash
+       mongosh localhost:27017/MasterDB --eval "db.Users.find()"
+     ```   
+     Expected Output:
+    { user_id: 1, name: "Alice Johnson", email: "alice.johnson@example.com" },
+    { user_id: 2, name: "Bob Smith", email: "bob.smith@example.com" },
+    ...
+    ...
+
+4. Create an IAM user for the instructor for evaluation
+For the purpose of checking your code's correctness, you need to create an AWS IAM user for the instructor and attach it with the policy instructor_iam_policy.json which is present inside labDirectory. You will then generate the access keys for the user. Those access keys will be used by the instructor to make programmatic calls to AWS services via AWS CLI or APIs. Fill 1) Access key ID and 2)SECRET_ACCESS_KEY for the Instructor IAM user account in the data.json file which is present in the labDirectory.
+
+By completing this lab, you will have automated the deployment of a MongoDB server with Ansible, including configuration management and data population.

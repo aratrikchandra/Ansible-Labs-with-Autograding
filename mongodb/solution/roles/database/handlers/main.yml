@@ -1,0 +1,11 @@
+# roles/database/handlers/main.yml
+---
+- name: daemon-reload
+  systemd:
+    daemon_reload: yes
+
+- name: restart mongodb
+  service:
+    name: mongod
+    state: restarted
+    enabled: yes
