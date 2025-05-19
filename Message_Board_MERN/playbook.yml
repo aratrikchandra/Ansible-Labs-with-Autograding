@@ -1,0 +1,6 @@
+---
+- hosts: appserver
+  become: yes
+  roles:
+    - database
+    - deploy_app

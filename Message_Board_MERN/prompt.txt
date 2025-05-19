@@ -1,0 +1,802 @@
+I have an ansible lab on setting up mongodb in ec2 instance. problem statement: Automate MongoDB Setup on EC2 Using Ansible
+
+Objective:
+Automate the installation and configuration of MongoDB 8.0.5 on an Ubuntu 22.04 EC2 instance using Ansible.
+---
+
+### Tasks to Complete
+
+1. Set Up EC2 Instance  
+   - Launch an EC2 instance with:  
+     - OS: Ubuntu 22.04 LTS  
+     - Instance type: `t2.micro`  
+     - Security group allowing SSH (port 22).  
+
+2. Configure Ansible Project Structure  
+   - Complete the following files:  
+     - `inventory/inventory.ini`: Define the EC2 instance’s public IP, SSH user (`ubuntu`), and path to the private key (`ansible.pem`).  
+     - `roles/database/tasks/main.yml`: Complete the Ansible tasks to install MongoDB, configure it, and populate the database.  
+     - `playbook.yml`: Assign the `database` role to the `DB-server` group.  
+
+3. Key Files to Edit  
+    `inventory.ini`:  
+     ```ini
+     [DB-server]
+     <EC2_PUBLIC_IP> ansible_user=<username> ansible_ssh_private_key_file=<path to the private key>
+     ```  
+     Replace `<EC2_PUBLIC_IP>` , `<username>`, `<path to the private key>` with correct details.  
+
+   - `tasks/main.yml`:  
+     Use Ansible modules to:  
+      1. Install Prerequisites
+      Use the apt module to install gnupg and curl.
+
+      Ensure the package cache is updated before installing these packages.
+
+      2. Add MongoDB 8.0 Repository
+      GPG Key Setup:
+
+      Use a block to group tasks related to repository setup.
+
+      a) Create the /usr/share/keyrings directory with proper permissions(0755) using the file module.
+
+      b) Securely Import MongoDB’s GPG Key:
+
+      c) Fetch the GPG key from https://www.mongodb.org/static/pgp/server-8.0.asc.
+
+      Use a shell command to download, validate, and save the key to /usr/share/keyrings/mongodb-server-8.0.gpg.
+
+      Ensure the task is idempotent by checking if the key file already exists.
+
+      Repository Configuration:
+
+      Use the apt_repository module to add the MongoDB 8.0 repository.
+
+      The repository entry must include:
+
+      Architecture (amd64,arm64).
+
+      Reference to the GPG key using signed-by.
+
+      Correct URL: https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse.
+
+      Save the repository configuration under a specific filename (e.g., mongodb-org-8.0.list).
+
+      3. Install MongoDB 8.0.5 with Exact Versions
+      Use the apt module to install specific package versions:
+
+      mongodb-org=8.0.5
+
+      mongodb-org-database=8.0.5
+
+      mongodb-org-server=8.0.5
+
+      mongodb-org-shell=8.0.5
+
+      mongodb-org-tools=8.0.5
+
+      mongodb-mongosh=2.4.2
+
+      Ensure the installation forces version consistency and updates the package cache.
+
+      Trigger handlers to reload the systemd daemon and restart MongoDB only if changes occur.
+
+      4. Configure MongoDB Directories
+      Use the file module to create:
+
+      /var/lib/mongodb (data storage).
+
+      /var/log/mongodb (log storage).
+
+      Set ownership to mongodb:mongodb and permissions to 0755.
+
+      Use a loop to avoid redundant code.
+
+      5. Generate MongoDB Configuration
+      Use the template module to deploy mongod.conf.j2 to /etc/mongod.conf.
+
+      Set the correct ownership (mongodb:mongodb) and permissions (0644).
+
+      Notify handlers to reload the systemd daemon and restart MongoDB if the configuration changes.
+
+      6. Manage MongoDB Service
+      Use the service module to ensure mongod is:
+
+      Started immediately.
+
+      Enabled to start on system boot. 
+
+   - `playbook.yml`:  
+     Ensure the playbook targets the `DB-server` group and uses the `database` role.  
+
+---
+
+### Provided Code Explanation  
+
+1. Handlers (`handlers/main.yml`)  
+   - `daemon-reload`: Reloads systemd after configuration changes.  
+   - `restart mongodb`: Restarts MongoDB and ensures it’s enabled.  
+   - These are triggered by `notify` in tasks (e.g., after installing MongoDB or updating `mongod.conf`).  
+
+2. Template (`templates/mongod.conf.j2`)  
+   - Configures MongoDB to:  
+     - Log to `/var/log/mongodb/mongod.log`.  
+     - Store data in `/var/lib/mongodb`.  
+     - Listen on port 27017 and bind to all network interfaces (`bindIpAll: true`).  
+
+3. Population Script (`files/populate.js`)  
+   - Clears the `Users` collection and inserts 20 sample documents into `MasterDB`.  
+   - The Ansible task runs this script using `mongosh` to ensure idempotency (only inserts data if it doesn’t exist).  
+
+---
+
+### Required Ansible Concepts  
+
+1. Roles: Organize tasks, handlers, and files into reusable components.  
+2. Modules:  
+   - `apt`: Install packages and manage repositories.  
+   - `file`: Create directories and set permissions.  
+   - `template`: Generate configuration files from Jinja2 templates.  
+   - `service`: Manage MongoDB service state (started/enabled).  
+   - `command`: Execute `mongosh` to run the population script.  
+3. Idempotency: Tasks should produce the same result on reruns (e.g., using `creates` in `shell` for the GPG key).  
+4. Handlers: Trigger actions (like restarting services) only when changes occur.  
+
+---
+
+### Execution Steps  
+
+1. Update `inventory.ini`  
+   - Replace `<EC2_PUBLIC_IP>` with your instance’s IP.  
+   - Place the SSH private key (`ansible.pem`) in the `inventory/` directory.  
+
+2. Run the Playbook  
+   ```bash
+   ansible-playbook -i inventory/inventory.ini playbook.yml
+   ```  
+
+3. Verify the Setup  
+   - SSH into the EC2 instance:  
+     ```bash
+     ssh -i inventory/ansible.pem ubuntu@<EC2_IP>
+     ```  
+   - Check MongoDB status:  
+     ```bash
+     systemctl status mongod
+     ```  
+     Expected Output:
+     ● mongod.service - MongoDB Database Server
+   Loaded: loaded (/lib/systemd/system/mongod.service; enabled; vendor preset: enabled)
+   Active: active (running) since ...  # <-- GREEN "active (running)"
+   Main PID: 1234 (mongod)
+     Tasks: 12 (limit: 4567)
+   Memory: 45.6M
+   CGroup: /system.slice/mongod.service
+           └─1234 /usr/bin/mongod ... --port 27017
+   - Confirm data insertion:  
+     ```bash
+       mongosh localhost:27017/MasterDB --eval "db.Users.find()"
+     ```   
+     Expected Output:
+    { user_id: 1, name: "Alice Johnson", email: "alice.johnson@example.com" },
+    { user_id: 2, name: "Bob Smith", email: "bob.smith@example.com" },
+    ...
+    ...
+
+4. Create an IAM user for the instructor for evaluation
+For the purpose of checking your code's correctness, you need to create an AWS IAM user for the instructor and attach it with the policy instructor_iam_policy.json which is present inside labDirectory. You will then generate the access keys for the user. Those access keys will be used by the instructor to make programmatic calls to AWS services via AWS CLI or APIs. Fill 1) Access key ID and 2)SECRET_ACCESS_KEY for the Instructor IAM user account in the data.json file which is present in the labDirectory.
+
+By completing this lab, you will have automated the deployment of a MongoDB server with Ansible, including configuration management and data population....directory Structure:
+├── data.json
+├── instructor_iam_policy.json
+├── inventory
+│   ├── ansible.pem
+│   └── inventory.ini
+├── playbook.yml
+└── roles
+    └── database
+        ├── files
+        │   └── populate.js
+        ├── handlers
+        │   └── main.yml
+        ├── tasks
+        │   └── main.yml
+        └── templates
+            └── mongod.conf.j2
+
+ideal solution code are: inventory/inventory.ini: [DB-server]
+34.207.162.83 ansible_user=ubuntu ansible_ssh_private_key_file=inventory/ansible.pem
+
+playbook.yml:
+---
+- hosts: DB-server
+  become: yes
+  roles:
+    - database
+roles/database/files/populate.js:
+
+// Remove all data from the collections
+db.Users.deleteMany({});
+
+// Users collection
+db.Users.insertMany([
+    { user_id: 1, name: "Alice Johnson", email: "alice.johnson@example.com" },
+    { user_id: 2, name: "Bob Smith", email: "bob.smith@example.com" },
+    { user_id: 3, name: "Charlie Brown", email: "charlie.brown@example.com" },
+    { user_id: 4, name: "David Wilson", email: "david.wilson@example.com" },
+    { user_id: 5, name: "Eva Adams", email: "eva.adams@example.com" },
+    { user_id: 6, name: "Frank Miller", email: "frank.miller@example.com" },
+    { user_id: 7, name: "Grace Lee", email: "grace.lee@example.com" },
+    { user_id: 8, name: "Hannah Davis", email: "hannah.davis@example.com" },
+    { user_id: 9, name: "Ian Thompson", email: "ian.thompson@example.com" },
+    { user_id: 10, name: "Jack White", email: "jack.white@example.com" },
+    { user_id: 11, name: "Karen Martinez", email: "karen.martinez@example.com" },
+    { user_id: 12, name: "Liam Clark", email: "liam.clark@example.com" },
+    { user_id: 13, name: "Mia Lopez", email: "mia.lopez@example.com" },
+    { user_id: 14, name: "Noah Gonzalez", email: "noah.gonzalez@example.com" },
+    { user_id: 15, name: "Olivia Harris", email: "olivia.harris@example.com" },
+    { user_id: 16, name: "Paul Martin", email: "paul.martin@example.com" },
+    { user_id: 17, name: "Quinn Walker", email: "quinn.walker@example.com" },
+    { user_id: 18, name: "Rachel Lewis", email: "rachel.lewis@example.com" },
+    { user_id: 19, name: "Sam Young", email: "sam.young@example.com" },
+    { user_id: 20, name: "Tina King", email: "tina.king@example.com" }
+]);
+roles/database/handlers/main.yml:
+---
+- name: daemon-reload
+  systemd:
+    daemon_reload: yes
+
+- name: restart mongodb
+  service:
+    name: mongod
+    state: restarted
+    enabled: yes
+roles/database/tasks/main.yml:
+# roles/database/tasks/main.yml
+---
+- name: Install prerequisites
+  apt:
+    name: ["gnupg", "curl"]
+    state: present
+    update_cache: yes
+
+- name: Add MongoDB 8.0 repository
+  block:
+    - name: Ensure keyrings directory
+      file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+    
+    - name: Import MongoDB GPG key
+      shell: |
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg --batch -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+      args:
+        creates: /usr/share/keyrings/mongodb-server-8.0.gpg
+    
+    - name: Add repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+        filename: mongodb-org-8.0.list
+        state: present
+
+- name: Install MongoDB 8.0.5 with exact versions
+  apt:
+    name:
+      - mongodb-org=8.0.5
+      - mongodb-org-database=8.0.5
+      - mongodb-org-server=8.0.5
+      - mongodb-org-shell=8.0.5
+      - mongodb-org-tools=8.0.5
+      - mongodb-mongosh=2.4.2
+    state: present
+    force: yes
+    update_cache: yes
+  notify: 
+    - daemon-reload
+    - restart mongodb
+
+- name: Create fresh MongoDB directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: mongodb
+    group: mongodb
+    mode: '0755'
+  loop:
+    - /var/lib/mongodb
+    - /var/log/mongodb
+
+- name: Configure MongoDB with idempotent template
+  template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: mongodb
+    group: mongodb
+    mode: '0644'
+  notify:
+    - daemon-reload
+    - restart mongodb
+
+- name: Ensure MongoDB is enabled and running
+  service:
+    name: mongod
+    state: started
+    enabled: yes
+
+- name: Wait for MongoDB to become ready
+  wait_for:
+    port: 27017
+    delay: 5
+    timeout: 60
+
+- name: Copy population script
+  copy:
+    src: populate.js
+    dest: /tmp/populate.js
+    mode: '0644'
+
+- name: Populate database
+  command: mongosh --quiet localhost:27017/MasterDB /tmp/populate.js
+  register: populate_result
+  changed_when: "'inserted' in populate_result.stdout"
+
+roles/database/templates/mongod.conf.j2:
+systemLog:
+  destination: file
+  path: /var/log/mongodb/mongod.log
+  logAppend: true
+
+storage:
+  dbPath: /var/lib/mongodb
+
+net:
+  port: 27017
+  bindIpAll: true
+
+.............now we have another lab where we setup nodejs react for an application..problem statement:
+Problem Statement for Ansible Lab: Deploy Node.js Backend + React Frontend on AWS EC2  
+
+Objective: Deploy a Full stack application (Node.js backend + React frontend) on an AWS EC2 Ubuntu 22.04 instance using Ansible. Configure Nginx to serve the React app on port 80 and proxy API requests to the Node.js backend.  
+
+---
+
+Steps to Complete:  
+1. Set Up AWS EC2 Instance:  
+   - Launch Ubuntu 22.04 instance (manually or via Terraform).  
+   - Configure security group to allow:  
+     - Port 80 (HTTP access for React frontend)  
+     - Port 22 (SSH for Ansible)  
+
+2. Configure Ansible Inventory:  
+   - Edit `inventory/inventory.ini` with:  
+     - EC2 instance public IP  
+     - `ubuntu` as the user  
+     - Path to SSH private key (`ansible.pem`)  
+   - Example:  
+     ```  
+     [webserver]  
+     54.210.12.34 ansible_user=ubuntu ansible_ssh_private_key_file=inventory/ansible.pem  
+     ```  
+   - Paste your AWS private key into `inventory/ansible.pem`.  
+
+3. Complete the Ansible Playbook:  
+   - Edit `playbook.yml` to:  
+     - Target the `webserver` group  
+     - Enable privilege escalation (`become: yes`)  
+     - Assign the `deploy_node_app` role  
+
+4. Finish the Role Tasks:  
+   - Edit `roles/deploy_node_app/tasks/main.yml` to implement:  
+     - Node.js backend setup  
+     - React frontend build/deployment  
+     - Nginx reverse proxy configuration  
+
+---
+
+Provided Files & Their Purpose:  
+
+1. Application Code:  
+   - Backend:  
+     - `app/app.js`: Express.js server on port 5000 with `/api` endpoint  
+     - `app/package.json`: Defines dependencies (Express, Body-Parser)  
+   - Frontend:  
+     - `client/`: React application with API integration  
+     - `client/package.json`: React dependencies and build scripts  
+
+2. Ansible Configuration:  
+   - `inventory.ini`: Defines target server connection details  
+   - `playbook.yml`: Master playbook to execute the deployment role  
+
+3. Role Components:  
+   - Systemd Service:  
+     - `files/node_app.service`: Runs Node.js app as background service under `ubuntu` user  
+   - Nginx Template:  
+     - `templates/react_node.conf.j2`: Configures:  
+       - Port 80 listener  
+       - Static file serving from `/var/www/react-app` (React build)  
+       - Proxy to Node.js backend at `localhost:5000` for `/api` routes  
+   - Tasks:  
+     - Partially written `tasks/main.yml` with placeholders for:  
+       - Package installation (Node.js, npm, Nginx)  
+       - File transfers (app/client code)  
+       - Dependency installation  
+       - React build process  
+       - Nginx configuration  
+
+---
+
+Tasks to Complete in `tasks/main.yml`:  
+
+1. Server Setup:  
+   - Install prerequisites: `curl`, `ca-certificates`, `gnupg`, `nginx`  
+   - Add NodeSource repository for Node.js 22.x  
+   - Install Node.js and npm v10.9.2  
+
+2. Node.js Backend:  
+   - Create `/home/ubuntu/app` directory  
+   - Copy `app/` code to EC2  
+   - Install backend dependencies  
+   - Configure systemd service (`node_app.service`)  
+
+3. React Frontend:  
+   - Create `/home/ubuntu/react-app` directory  
+   - Copy `client/` code to EC2  
+   - Install React dependencies  
+   - Build production version (`npm run build`)  
+   - Deploy build to `/var/www/react-app`  
+
+4. Nginx Configuration:  
+   - Deploy `react_node.conf.j2` template  
+   - Enable site by creating symlink in `sites-enabled`  
+   - Remove default Nginx site  
+   - Restart Nginx  
+
+---
+
+Key Ansible Concepts Required:  
+1. Inventory: Define target hosts with IP/SSH credentials.  
+2. Playbooks: Coordinate roles and privilege escalation.  
+3. Modules:  
+   - `apt`: Install system packages (Node.js, Nginx)  
+   - `copy`: Transfer app/client code to EC2  
+   - `npm`: Manage Node.js dependencies  
+   - `template`: Generate Nginx config from .j2 file  
+   - `systemd`: Manage Node.js service  
+   - `file`: Create directories/configure permissions  
+4. Roles: Modularize tasks/files/templates.  
+
+---
+
+Validation:  
+- Successful deployment allows:  
+  - React frontend at `http://<EC2_IP>`  
+  - Node.js API accessible via `http://<EC2_IP>/api`  
+- Nginx must:  
+  - Serve static React files from `/var/www/react-app`  
+  - Proxy `/api` requests to `localhost:5000`  
+- Services must survive server reboots (systemd + Nginx enabled).  
+
+Note: All tasks must be idempotent. Use `creates` in the NodeSource `shell` task to avoid duplicate repository setup. Test React build with `NODE_OPTIONS: --openssl-legacy-provider` if needed.
+directory Structure:
+.
+├── app
+│   ├── app.js
+│   └── package.json
+├── client
+│   ├── package.json
+│   ├── public
+│   │   └── index.html
+│   └── src
+│       ├── App.js
+│       └── index.js
+├── data.json
+├── instructor_iam_policy.json
+├── inventory
+│   ├── ansible.pem
+│   └── inventory.ini
+├── playbook.yml
+├── problem_statement.txt
+├── prompt.txt
+└── roles
+    └── deploy_node_app
+        ├── files
+        │   └── node_app.service
+        ├── tasks
+        │   └── main.yml
+        └── templates
+            └── react_node.conf.j2
+solution code:
+
+........the content of app/app.js: const express = require('express');
+const bodyParser = require('body-parser');
+
+const app = express();
+const PORT = 5000;
+
+app.use(bodyParser.json());
+
+app.get('/api', (req, res) => {
+    res.send('Node-Express App using Ansible');
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+});
+
+...content of package.json: {
+    "name": "mern-item",
+    "version": "1.0.0",
+    "description": "Sample Description",
+    "main": "app.js",
+    "scripts": {
+      "start": "node app.js"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+      "body-parser": "^1.20.3",
+      "express": "^4.21.2"
+    }
+  }.....
+  content of client/public/index.html: 
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>React App</title>
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+</body>
+</html>
+.....content of client/src/index.js:
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+....client/src/App.js:
+import React, { useEffect, useState } from 'react';
+
+function App() {
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api')
+      .then(res => res.text())
+      .then(data => setMessage(data))
+      .catch(console.error);
+  }, []);
+
+  return (
+    <div>
+      <h1>React Frontend</h1>
+      <p>Backend Response: {message}</p>
+    </div>
+  );
+}
+
+export default App;
+.........
+client/package.json: {
+  "name": "client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}.....
+
+  
+  roles/deploy_node_app/files/node_app.service: 
+  [Unit]
+Description=Node.js Application
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/app
+ExecStart=/usr/bin/npm start
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+  ........
+content of roles/deploy_node_app/templates/react_node.conf.j2 :
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        root /var/www/react-app;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+...content of roles/deploy_node_app/tasks/main.yml:
+---
+- name: Update package cache
+  apt:
+    update_cache: yes
+
+- name: Install prerequisites
+  apt:
+    name: [curl, ca-certificates, gnupg, nginx]
+    state: present
+
+- name: Add NodeSource repository for Node.js 22.x
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: Install specific npm version
+  npm:
+    name: npm
+    global: yes
+    version: 10.9.2
+
+# Node.js Backend Setup
+- name: Create app directory
+  file:
+    path: /home/ubuntu/app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy application files
+  copy:
+    src: "../../../app/"
+    dest: /home/ubuntu/app/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install dependencies
+  npm:
+    path: /home/ubuntu/app
+    production: yes
+
+- name: Create systemd service
+  copy:
+    src: node_app.service
+    dest: /etc/systemd/system/node_app.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable and start service
+  systemd:
+    name: node_app
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# React Frontend Setup
+- name: Create React app directory
+  file:
+    path: /home/ubuntu/react-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy React application files
+  copy:
+    src: "../../../client/"
+    dest: /home/ubuntu/react-app/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install React dependencies
+  npm:
+    path: /home/ubuntu/react-app
+    state: present
+
+- name: Build React application
+  command: npm run build
+  args:
+    chdir: /home/ubuntu/react-app
+  environment:
+    NODE_OPTIONS: --openssl-legacy-provider
+
+- name: Verify build directory exists
+  stat:
+    path: /home/ubuntu/react-app/build
+  register: build_dir
+
+- name: Fail if build directory missing
+  fail:
+    msg: "React build directory not found - build failed"
+  when: not build_dir.stat.exists
+
+- name: Create directory for React static files
+  file:
+    path: /var/www/react-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Deploy React build
+  copy:
+    src: /home/ubuntu/react-app/build/
+    dest: /var/www/react-app/
+    owner: ubuntu
+    group: ubuntu
+    remote_src: yes
+
+# Nginx Configuration
+- name: Configure Nginx
+  template:
+    src: react_node.conf.j2
+    dest: /etc/nginx/sites-available/react_node.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/react_node.conf
+    dest: /etc/nginx/sites-enabled/react_node.conf  # Add specific filename
+    state: link
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
+    enabled: yes
+
+..playbook.yml: ---
+- hosts: webserver
+  become: yes
+  roles:
+    - deploy_node_app
+..inventory.ini:
+[webserver]
+34.228.195.175 ansible_user=ubuntu ansible_ssh_private_key_file=inventory/ansible.pem
+
+....now I want you to combine these two labs and build a simple application which has mongodb, node and react in the same manner...the application should be very basic like any user can post a message which has fields like title, description, username. and when the message is posted it should be seen in the website...note: the application code should be very simple as the main goal is to teach students how to use ansible to setup mongodb, react and node...write content of the entire new project structure and the file contents.

@@ -1,0 +1,107 @@
+---
+- name: Install system dependencies
+  apt:
+    name: [curl, ca-certificates, gnupg, nginx]
+    state: present
+
+- name: Add NodeSource repository
+  shell: |
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js and npm
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+# Backend setup
+- name: Create app directory
+  file:
+    path: /home/ubuntu/app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy backend code
+  copy:
+    src: "../../../app/"
+    dest: /home/ubuntu/app/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install backend dependencies
+  npm:
+    path: /home/ubuntu/app
+    production: yes
+
+- name: Configure systemd service
+  copy:
+    src: node_app.service
+    dest: /etc/systemd/system/node_app.service
+    mode: 0644
+  notify: reload systemd
+
+# Frontend setup
+- name: Create React app directory
+  file:
+    path: /home/ubuntu/client
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy frontend code
+  copy:
+    src: "../../../client/"
+    dest: /home/ubuntu/client/
+    owner: ubuntu
+    group: ubuntu
+
+- name: Install frontend dependencies
+  npm:
+    path: /home/ubuntu/client
+    state: present
+
+- name: Build React app
+  command: npm run build
+  args:
+    chdir: /home/ubuntu/client
+
+- name: Deploy React build
+  copy:
+    src: /home/ubuntu/client/build/
+    dest: /var/www/react-app
+    owner: ubuntu
+    group: ubuntu
+    remote_src: yes
+
+# Nginx configuration
+- name: Configure Nginx
+  template:
+    src: react_node.conf.j2
+    dest: /etc/nginx/sites-available/react_node.conf
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/react_node.conf
+    dest: /etc/nginx/sites-enabled/react_node.conf
+    state: link
+
+- name: Remove default site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
+    enabled: yes
+
+- name: Start Node application
+  systemd:
+    name: node_app
+    state: started
+    enabled: yes
+    daemon_reload: yes
