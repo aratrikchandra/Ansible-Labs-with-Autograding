@@ -10,12 +10,16 @@
   args:
     creates: /etc/apt/sources.list.d/nodesource.list
 
-- name: Install Node.js and npm
+- name: Install Node.js
   apt:
     name: nodejs
     state: present
     update_cache: yes
-
+- name: Install specific npm version
+  npm:
+    name: npm
+    global: yes
+    version: 10.9.2
 # Backend setup
 - name: Create app directory
   file:
@@ -46,7 +50,7 @@
 # Frontend setup
 - name: Create React app directory
   file:
-    path: /home/ubuntu/client
+    path: /home/ubuntu/react-app
     state: directory
     owner: ubuntu
     group: ubuntu
@@ -54,23 +58,42 @@
 - name: Copy frontend code
   copy:
     src: "../../../client/"
-    dest: /home/ubuntu/client/
+    dest: /home/ubuntu/react-app/
     owner: ubuntu
     group: ubuntu
 
 - name: Install frontend dependencies
   npm:
-    path: /home/ubuntu/client
+    path: /home/ubuntu/react-app
     state: present
 
-- name: Build React app
+- name: Build React application
   command: npm run build
   args:
-    chdir: /home/ubuntu/client
+    chdir: /home/ubuntu/react-app
+  environment:
+    NODE_OPTIONS: --openssl-legacy-provider
+
+- name: Verify build directory exists
+  stat:
+    path: /home/ubuntu/react-app/build
+  register: build_dir
+
+- name: Fail if build directory missing
+  fail:
+    msg: "React build directory not found - build failed"
+  when: not build_dir.stat.exists
+
+- name: Create directory for React static files
+  file:
+    path: /var/www/react-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
 
 - name: Deploy React build
   copy:
-    src: /home/ubuntu/client/build/
+    src: /home/ubuntu/react-app/build/
     dest: /var/www/react-app
     owner: ubuntu
     group: ubuntu

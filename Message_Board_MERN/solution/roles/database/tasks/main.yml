@@ -32,6 +32,8 @@
       - mongodb-org-database=8.0.5
       - mongodb-org-server=8.0.5
       - mongodb-org-shell=8.0.5
+      - mongodb-org-tools=8.0.5
+      - mongodb-mongosh=2.4.2
     state: present
     force: yes
     update_cache: yes

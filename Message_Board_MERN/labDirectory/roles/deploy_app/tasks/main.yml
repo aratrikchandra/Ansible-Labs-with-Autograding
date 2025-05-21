@@ -1,0 +1,63 @@
+---
+- name: Install system dependencies
+  # add your code here
+
+- name: Add NodeSource repository
+  # add your code here
+
+- name: Install Node.js
+  # add your code here
+- name: Install specific npm version
+  # add your code here
+
+# Backend setup
+- name: Create app directory
+  # add your code here
+
+- name: Copy backend code
+  # add your code here
+
+- name: Install backend dependencies
+  # add your code here
+
+- name: Configure systemd service
+  # add your code here
+
+# Frontend setup
+- name: Create React app directory
+  # add your code here
+
+- name: Copy frontend code
+  # add your code here
+
+- name: Install frontend dependencies
+  # add your code here
+
+- name: Build React application
+  # add your code here
+
+- name: Create directory for React static files
+  # add your code here
+  
+- name: Deploy React build
+  # add your code here
+
+# Nginx configuration
+- name: Configure Nginx
+  # add your code here
+
+- name: Enable Nginx site
+  # add your code here
+
+- name: Remove default site
+  # add your code here
+
+- name: Restart Nginx
+  # add your code here
+
+- name: Start Node application
+  systemd:
+    name: node_app
+    state: started
+    enabled: yes
+    daemon_reload: yes

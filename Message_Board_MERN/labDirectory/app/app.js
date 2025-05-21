@@ -38,7 +38,13 @@ app.post('/api/messages', async (req, res) => {
       username,
       createdAt: new Date()
     });
-    res.status(201).json(result.ops[0]);
+
+    // Get the inserted document using the insertedId
+    const insertedDoc = await db.collection('messages').findOne({
+      _id: result.insertedId
+    });
+
+    res.status(201).json(insertedDoc);  // Send the found document
   } catch (err) {
     res.status(400).send(err.message);
   }

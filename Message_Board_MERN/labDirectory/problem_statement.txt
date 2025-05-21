@@ -1,0 +1,234 @@
+Deploy Full-Stack MERN Application on AWS EC2
+*(Prerequisites: Completion of Activity 2 [Node/React Setup] and 3 [MongoDB Setup])*
+
+Objective:
+Automate deployment of a complete message board application featuring:
+
+MongoDB 8.0.5 database
+
+Node.js/Express backend API
+
+React frontend
+
+Nginx reverse proxy
+
+---
+Application Overview
+--Key Components
+1) Frontend (React)
+
+Purpose: User interface for submitting/viewing messages
+
+Features:
+
+Form for submitting messages (title, description, username)
+
+Real-time display of existing messages
+
+Responsive design with styled components
+
+Tech Stack:
+
+React 18 with functional components/hooks
+
+Fetch API for backend communication
+
+CSS-in-JS for styling
+
+2) Backend (Node.js/Express)
+
+API Endpoints:
+
+GET /api/messages: Fetch all messages
+
+POST /api/messages: Create new message
+
+Database Integration:
+
+MongoDB driver for CRUD operations
+
+Automatic connection handling
+
+Tech Stack:
+
+Express.js web framework
+
+Body-parser middleware
+
+MongoDB Node.js driver
+
+3) Database (MongoDB)
+
+Collections:
+
+messages: Stores message documents
+
+Document Structure:
+
+json
+{
+  "_id": ObjectId,
+  "title": "Message Title",
+  "description": "Detailed content",
+  "username": "author123",
+  "createdAt": ISODate
+}
+4) Reverse Proxy (Nginx)
+
+Configuration:
+
+Serves React static files on port 80
+
+Proxies /api requests to Node.js backend (port 5000)
+
+Benefits:
+
+Single entry point for application
+
+Improved security and performance
+
+### Tasks to Complete  
+
+#### 1. Prepare the Environment  
+   - Launch an EC2 Instance (as done in prior activities):  
+     - OS: Ubuntu 22.04 LTS  
+     - Instance type: `t2.micro`  
+     - Security Group: Allow ports 22 (SSH), 80 (HTTP).
+   - Reuse Your Ansible Project Structure:  
+     - Use the same `inventory.ini`, `ansible.pem`, and role-based directory structure from earlier activities.  
+
+---
+
+#### 2. Update the Ansible Playbook *(Reference: "playbook.yml" from Activity 2 & 3)*  
+   - Modify `playbook.yml` to:  
+     1. Target the `appserver` host group.  
+     2. Enable privilege escalation (`become: yes`).  
+     3. Assign both the `database` (from Activity 3) and `deploy_app` (from Activity 2) roles.  
+
+---
+
+#### 3. Expand the Database Role *(Revisit Activity 3’s Tasks with Modifications)*  
+   - File: `roles/database/tasks/main.yml`  
+   - Tasks:  
+     1. Install Prerequisites
+      Use the apt module to install gnupg and curl.
+     2. Add MongoDB 8.0 Repository
+
+      a) Create the /usr/share/keyrings directory with proper permissions(0755) using the file module.
+
+      b) Securely Import MongoDB’s GPG Key:
+
+      c) Fetch the GPG key from https://www.mongodb.org/static/pgp/server-8.0.asc.
+
+      d) Repository Configuration:
+      Use the apt_repository module to add the MongoDB 8.0 repository.
+
+     3. Install MongoDB 8.0.5:  
+        - Use the `apt` module to install exact package versions 
+        'mongodb-org': '8.0.5',
+        'mongodb-org-database': '8.0.5',
+        'mongodb-org-server': '8.0.5',
+        'mongodb-org-shell': '8.0.5',
+        'mongodb-org-tools': '8.0.5',
+        'mongodb-mongosh': '2.4.2' 
+        - Ensure the installation triggers a handler to reload systemd and restart MongoDB.  
+     4. Configure MongoDB Directories:  
+        - Create `/var/lib/mongodb` and `/var/log/mongodb` using the `file` module.  
+        - Set ownership to `mongodb:mongodb` and permissions to `0755`.  
+     5. Deploy MongoDB Configuration:  
+        - Use the `template` module to copy `mongod.conf.j2` to `/etc/mongod.conf`.  
+        - Ensure MongoDB binds to all network interfaces (`bindIpAll: true`).  
+     6. Service Management:  
+        - Ensure MongoDB is started and enabled using the `service` module.  
+
+---
+### Provided Code Explanation  
+
+1. Handlers (`handlers/main.yml`)  
+   - `daemon-reload`: Reloads systemd after configuration changes.  
+   - `restart mongodb`: Restarts MongoDB and ensures it’s enabled.  
+   - These are triggered by `notify` in tasks (e.g., after installing MongoDB or updating `mongod.conf`).  
+
+2. Template (`templates/mongod.conf.j2`)  
+   - Configures MongoDB to:  
+     - Log to `/var/log/mongodb/mongod.log`.  
+     - Store data in `/var/lib/mongodb`.  
+     - Listen on port 27017 and bind to all network interfaces (`bindIpAll: true`). 
+
+#### 4. Modify the Deploy App Role *(Build on Activity 2’s Tasks with Enhancements)*  
+   - File: `roles/deploy_app/tasks/main.yml`  
+   - Tasks:  
+      1. Server Setup:  
+      - Install prerequisites: `curl`, `ca-certificates`, `gnupg`, `nginx`  
+      - Add NodeSource repository for Node.js 22.x  
+      - Install Node.js and npm v10.9.2  
+      2. Node.js Backend:  
+         - Create `/home/ubuntu/app` directory  
+         - Copy `app/` code to EC2  
+         - Install backend dependencies  
+         - Configure systemd service (`node_app.service`)   
+      3. React Frontend:  
+         - Create `/home/ubuntu/react-app` directory  
+         - Copy `client/` code to EC2  `/home/ubuntu/react-app` directory
+         - Install React dependencies  
+         - Build production version (`npm run build`)  
+         - Deploy build to `/var/www/react-app`  
+     3. Nginx Configuration:  
+        - Use the `template` module to deploy `react_node.conf.j2` to `/etc/nginx/sites-available/`.  
+        - Remove the default Nginx site and enable the new site by creating symlink in `sites-enabled`.  
+        - Restart Nginx after configuration changes.  
+
+---
+### Provided Code Explanation  
+   1. Systemd Service:  
+     - `files/node_app.service`: Runs Node.js app as background service under `ubuntu` user
+   2. Nginx Template:
+      `templates/react_node.conf.j2`: Configures:  
+       - Port 80 listener  
+       - Static file serving from `/var/www/react-app` (React build)  
+       - Proxy to Node.js backend at `localhost:5000` for `/api` routes  
+#### 5. Validation Steps *(Detailed Checks for Success)*  
+1. Verify MongoDB Installation:  
+   - SSH into the EC2 instance and run:  
+     ```bash  
+     systemctl status mongod  
+     ```  
+     Expected Output:  
+     ```  
+     Active: active (running)  
+     Main PID: [PID] (mongod)  
+     ```   
+
+2. Test Node.js Backend:  
+   - Check if the service is running:  
+     ```bash  
+     systemctl status node_app  
+     ```  
+     Expected Output: `Active: active (running)`.  
+   - Test the API endpoint:  
+     ```bash  
+     curl http://localhost:5000/api/messages  
+     ```  
+     Expected Output: `[]` (empty array).  
+
+3. Validate React Frontend:  
+   - Open `http://<EC2_PUBLIC_IP>` in a browser.  
+   Expected Result:  
+     - A "Message Board" header with a form to submit messages(Refer to demo.png present in labDirectory).
+     - No error messages in the browser console.  
+
+4. End-to-End Test:  
+   - Submit a message via the React form (fill all fields).  
+   - Check MongoDB for data persistence:  
+     ```bash  
+     mongosh localhost:27017/messageDB --eval "db.messages.find()"  
+     ```  
+     Expected Output: A document with your submitted data (e.g., `title`, `username`).  
+
+---
+
+#### Submission Instructions  
+1. Update `inventory.ini` with your EC2 instance’s public IP and SSH key path.  
+2. Include the IAM user’s access keys in `data.json` (as done in prior activities).  
+
+Note: Use concepts from your previous activities (e.g., handlers for service restarts, Jinja templates for configurations) to avoid redundant work.

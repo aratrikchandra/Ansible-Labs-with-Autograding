@@ -1,0 +1,32 @@
+---
+- name: Install prerequisites
+  # add your code here
+
+- name: Add MongoDB 8.0 repository
+  block:
+    - name: Ensure keyrings directory
+      # add your code here
+    
+    - name: Import MongoDB GPG key
+      # add your code here
+    
+    - name: Add repository
+      # add your code here
+
+- name: Install MongoDB 8.0.5
+  # add your code here
+  notify: 
+    - daemon-reload
+    - restart mongodb
+
+- name: Configure MongoDB directories
+  # add your code here
+
+- name: Configure MongoDB
+  # add your code here
+  notify:
+    - daemon-reload
+    - restart mongodb
+
+- name: Ensure MongoDB is running
+  # add your code here
